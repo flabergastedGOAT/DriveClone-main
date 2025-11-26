@@ -1,0 +1,124 @@
+// SQLite Database Schema for DriveClone
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(uuid())
+  email         String    @unique
+  name          String?
+  emailVerified DateTime?
+  image         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  accounts      Account[]
+  sessions      Session[]
+  spaces        Space[]   @relation("SpaceAdmin")
+  uploadedFiles SpaceFile[]
+  activities    Activity[]
+}
+
+model Account {
+  id                String  @id @default(uuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(uuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model Space {
+  id          String    @id @default(uuid())
+  name        String
+  description String?
+  adminId     String
+  adminEmail  String
+  createdAt   DateTime  @default(now())
+  
+  admin       User      @relation("SpaceAdmin", fields: [adminId], references: [id], onDelete: Cascade)
+  members     SpaceMember[]
+  files       SpaceFile[]
+  activities  Activity[]
+}
+
+model SpaceMember {
+  id        String   @id @default(uuid())
+  spaceId   String
+  memberEmail String
+  role      String   @default("MEMBER")
+  addedAt   DateTime @default(now())
+  
+  space     Space    @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  
+  @@unique([spaceId, memberEmail])
+  @@index([spaceId])
+  @@index([memberEmail])
+}
+
+model SpaceFile {
+  id              String   @id @default(uuid())
+  spaceId         String
+  originalFilename String
+  storagePath     String
+  contentType     String?
+  size            BigInt
+  uploaderId      String
+  uploaderEmail   String
+  uploadedAt      DateTime @default(now())
+  
+  space           Space    @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  uploader        User     @relation(fields: [uploaderId], references: [id])
+  
+  @@index([spaceId])
+  @@index([uploaderId])
+}
+
+model Activity {
+  id        String   @id @default(uuid())
+  spaceId  String
+  userId    String?
+  userEmail String
+  action    String
+  details   String?
+  timestamp DateTime @default(now())
+  
+  space     Space    @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+  user      User?    @relation(fields: [userId], references: [id])
+  
+  @@index([spaceId])
+  @@index([userId])
+  @@index([timestamp])
+}
+

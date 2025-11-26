@@ -1,0 +1,922 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DriveClone - Shared Spaces</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-storage-compat.js"></script>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <div id="app" class="container mx-auto px-4 py-8">
+        <!-- Login Screen -->
+        <div id="login-screen" class="max-w-md mx-auto">
+            <div class="bg-white rounded-lg shadow-md p-8">
+                <h1 class="text-3xl font-bold text-center text-gray-800 mb-6">DriveClone</h1>
+                <p class="text-center text-gray-600 mb-8">Shared Spaces for Teams</p>
+                <button id="google-login" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition duration-200">
+                    Sign in with Google
+                </button>
+            </div>
+        </div>
+
+        <!-- Main Dashboard -->
+        <div id="dashboard" class="hidden">
+            <!-- Header -->
+            <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+                <div class="flex justify-between items-center">
+                    <div>
+                        <h1 class="text-2xl font-bold text-gray-800">DriveClone</h1>
+                        <p class="text-gray-600">Welcome, <span id="user-email"></span></p>
+                    </div>
+                    <button id="logout-btn" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg transition duration-200">
+                        Logout
+                    </button>
+                </div>
+            </div>
+
+            <!-- Spaces Section -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- Spaces List -->
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-xl font-semibold text-gray-800">My Spaces</h2>
+                        <button id="create-space-btn" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition duration-200">
+                            Create Space
+                        </button>
+                    </div>
+                    <div id="spaces-list" class="space-y-3 max-h-96 overflow-y-auto">
+                        <!-- Spaces will be loaded here -->
+                    </div>
+                </div>
+
+                <!-- Files Section -->
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-xl font-semibold text-gray-800">Files</h2>
+                        <button id="upload-file-btn" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition duration-200">
+                            Upload File
+                        </button>
+                    </div>
+                    <div id="selected-space-info" class="mb-4 p-3 bg-gray-50 rounded-lg">
+                        <p class="text-sm text-gray-600">Select a space to view files</p>
+                    </div>
+                    <div id="files-list" class="space-y-3 max-h-96 overflow-y-auto">
+                        <!-- Files will be loaded here -->
+                    </div>
+                </div>
+
+                <!-- Activity Log Section -->
+                <div class="mt-6 bg-white rounded-lg shadow-md p-6">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-xl font-semibold text-gray-800">Activity Log</h2>
+                        <button id="refresh-activity-btn" class="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg transition duration-200">
+                            Refresh
+                        </button>
+                    </div>
+                    <div id="activity-list" class="space-y-3 max-h-96 overflow-y-auto">
+                        <!-- Activity entries will be loaded here -->
+                    </div>
+                </div>
+
+                <!-- Members List Section -->
+                <div class="mt-6 bg-white rounded-lg shadow-md p-6">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-xl font-semibold text-gray-800">Space Members</h2>
+                        <button id="refresh-members-btn" class="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg transition duration-200">
+                            Refresh
+                        </button>
+                    </div>
+                    <div id="members-list" class="space-y-2 max-h-96 overflow-y-auto">
+                        <!-- Members will be loaded here -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Space Management -->
+            <div id="space-management" class="mt-6 bg-white rounded-lg shadow-md p-6 hidden">
+                <h3 class="text-lg font-semibold text-gray-800 mb-4">Space Management</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Add Member</label>
+                        <div class="flex">
+                            <input type="email" id="member-email" placeholder="Enter email address" 
+                                   class="flex-1 px-3 py-2 border border-gray-300 rounded-l-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <button id="add-member-btn" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-r-lg transition duration-200">
+                                Add
+                            </button>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Remove Member</label>
+                        <div class="flex">
+                            <select id="member-to-remove" class="flex-1 px-3 py-2 border border-gray-300 rounded-l-lg focus:outline-none focus:ring-2 focus:ring-red-500">
+                                <option value="">Select member to remove</option>
+                            </select>
+                            <button id="remove-member-btn" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-r-lg transition duration-200">
+                                Remove
+                            </button>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Space Actions</label>
+                        <div class="space-x-2">
+                            <button id="update-space-btn" class="bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded-lg transition duration-200">
+                                Update Space
+                            </button>
+                            <button id="delete-space-btn" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg transition duration-200">
+                                Delete Space
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modals -->
+        <!-- Create Space Modal -->
+        <div id="create-space-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+            <div class="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+                <h3 class="text-lg font-semibold text-gray-800 mb-4">Create New Space</h3>
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Space Name</label>
+                        <input type="text" id="space-name" placeholder="Enter space name" 
+                               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                        <textarea id="space-description" placeholder="Enter description (optional)" 
+                                  class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 h-20"></textarea>
+                    </div>
+                </div>
+                <div class="flex justify-end space-x-3 mt-6">
+                    <button id="cancel-create-space" class="px-4 py-2 text-gray-600 hover:text-gray-800 transition duration-200">
+                        Cancel
+                    </button>
+                    <button id="confirm-create-space" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg transition duration-200">
+                        Create Space
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- File Upload Modal -->
+        <div id="upload-file-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+            <div class="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+                <h3 class="text-lg font-semibold text-gray-800 mb-4">Upload File</h3>
+                <div class="space-y-4">
+                    <div>
+                        <input type="file" id="file-input" multiple 
+                               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+                </div>
+                <div class="flex justify-end space-x-3 mt-6">
+                    <button id="cancel-upload" class="px-4 py-2 text-gray-600 hover:text-gray-800 transition duration-200">
+                        Cancel
+                    </button>
+                    <button id="confirm-upload" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition duration-200">
+                        Upload
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyBfdK6LSvMSD6zEeh_y_CcClbXRfi-Kzz0",
+            authDomain: "driveclone-a1a38.firebaseapp.com",
+            projectId: "driveclone-a1a38",
+            storageBucket: "driveclone-a1a38.appspot.com",
+            messagingSenderId: "1031726143447",
+            appId: "1:1031726143447:web:bc64609a8e022f908d9d92"
+        };
+
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+        const storage = firebase.storage();
+
+        let currentUser = null;
+        let authToken = null;
+        let spaces = [];
+        let selectedSpaceId = null;
+
+        // DOM elements
+        const loginScreen = document.getElementById('login-screen');
+        const dashboard = document.getElementById('dashboard');
+        const userEmail = document.getElementById('user-email');
+        const spacesList = document.getElementById('spaces-list');
+        const filesList = document.getElementById('files-list');
+        const selectedSpaceInfo = document.getElementById('selected-space-info');
+        const spaceManagement = document.getElementById('space-management');
+
+        // Event listeners
+        document.getElementById('google-login').addEventListener('click', signInWithGoogle);
+        document.getElementById('logout-btn').addEventListener('click', signOut);
+        document.getElementById('create-space-btn').addEventListener('click', () => showModal('create-space-modal'));
+        document.getElementById('upload-file-btn').addEventListener('click', () => showModal('upload-file-modal'));
+        document.getElementById('confirm-create-space').addEventListener('click', createSpace);
+        document.getElementById('cancel-create-space').addEventListener('click', () => hideModal('create-space-modal'));
+        document.getElementById('confirm-upload').addEventListener('click', uploadFiles);
+        document.getElementById('cancel-upload').addEventListener('click', () => hideModal('upload-file-modal'));
+        document.getElementById('add-member-btn').addEventListener('click', addMemberToSpace);
+        document.getElementById('remove-member-btn').addEventListener('click', removeMemberFromSpace);
+        document.getElementById('update-space-btn').addEventListener('click', updateSpace);
+        document.getElementById('delete-space-btn').addEventListener('click', deleteSpace);
+        document.getElementById('refresh-activity-btn').addEventListener('click', loadActivityLog);
+        document.getElementById('refresh-members-btn').addEventListener('click', loadMembersList);
+
+        // Authentication
+        function signInWithGoogle() {
+            const provider = new firebase.auth.GoogleAuthProvider();
+            auth.signInWithPopup(provider)
+                .then((result) => {
+                    currentUser = result.user;
+                    authenticateWithBackend(result.user);
+                })
+                .catch((error) => {
+                    showError('Sign-in failed: ' + error.message);
+                });
+        }
+
+        async function authenticateWithBackend(user) {
+            try {
+                const idToken = await user.getIdToken();
+                const response = await fetch('/api/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ idToken })
+                });
+
+                const data = await response.json();
+                if (data.success) {
+                    // Store the Firebase ID token for API calls
+                    authToken = idToken;
+                    showDashboard(user);
+                    loadSpaces();
+                } else {
+                    showError('Backend authentication failed: ' + data.error);
+                }
+            } catch (error) {
+                showError('Authentication error: ' + error.message);
+            }
+        }
+
+        // Function to refresh Firebase ID token
+        async function refreshAuthToken() {
+            if (currentUser) {
+                try {
+                    authToken = await currentUser.getIdToken(true); // Force refresh
+                } catch (error) {
+                    console.error('Failed to refresh token:', error);
+                    // If token refresh fails, sign out the user
+                    signOut();
+                }
+            }
+        }
+
+        function signOut() {
+            auth.signOut().then(() => {
+                currentUser = null;
+                authToken = null;
+                showLoginScreen();
+            });
+        }
+
+        function showLoginScreen() {
+            loginScreen.classList.remove('hidden');
+            dashboard.classList.add('hidden');
+        }
+
+        function showDashboard(user) {
+            loginScreen.classList.add('hidden');
+            dashboard.classList.remove('hidden');
+            userEmail.textContent = user.email;
+        }
+
+        // Spaces management
+        async function loadSpaces() {
+            try {
+                const response = await fetch('/api/spaces', {
+                    headers: {
+                        'Authorization': 'Bearer ' + authToken
+                    }
+                });
+
+                if (response.ok) {
+                    const responseText = await response.text();
+                    if (responseText.trim()) {
+                        spaces = JSON.parse(responseText);
+                        displaySpaces();
+                    } else {
+                        spaces = [];
+                        displaySpaces();
+                    }
+                } else if (response.status === 401) {
+                    // Try to refresh the token and retry
+                    await refreshAuthToken();
+                    if (authToken) {
+                        // Retry the request with the new token
+                        const retryResponse = await fetch('/api/spaces', {
+                            headers: {
+                                'Authorization': 'Bearer ' + authToken
+                            }
+                        });
+                        if (retryResponse.ok) {
+                            const responseText = await retryResponse.text();
+                            if (responseText.trim()) {
+                                spaces = JSON.parse(responseText);
+                                displaySpaces();
+                            } else {
+                                spaces = [];
+                                displaySpaces();
+                            }
+                        } else {
+                            showError('Authentication failed. Please sign in again.');
+                            signOut();
+                        }
+                    } else {
+                        showError('Authentication failed. Please sign in again.');
+                        signOut();
+                    }
+                } else {
+                    const errorText = await response.text();
+                    let errorMessage = 'Failed to load spaces';
+                    try {
+                        const errorData = JSON.parse(errorText);
+                        errorMessage = errorData.error || errorMessage;
+                    } catch (e) {
+                        // Use default error message if JSON parsing fails
+                    }
+                    showError(errorMessage);
+                }
+            } catch (error) {
+                showError('Error loading spaces: ' + error.message);
+            }
+        }
+
+        function displaySpaces() {
+            spacesList.innerHTML = '';
+            spaces.forEach(space => {
+                const spaceDiv = document.createElement('div');
+                spaceDiv.className = 'p-4 border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer transition duration-200';
+                spaceDiv.innerHTML = `
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <h3 class="font-semibold text-gray-800">${space.name}</h3>
+                            <p class="text-sm text-gray-600">${space.description || 'No description'}</p>
+                            <p class="text-xs text-gray-500">Admin: ${space.adminEmail}</p>
+                        </div>
+                        <div class="text-right">
+                            <button onclick="selectSpace('${space.id}')" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm transition duration-200">
+                                Select
+                            </button>
+                        </div>
+                    </div>
+                `;
+                spacesList.appendChild(spaceDiv);
+            });
+        }
+
+        function selectSpace(spaceId) {
+            console.log('Selecting space:', spaceId);
+            selectedSpaceId = spaceId;
+            const space = spaces.find(s => s.id === spaceId);
+            if (!space) {
+                console.error('Space not found:', spaceId);
+                return;
+            }
+            console.log('Found space:', space);
+            selectedSpaceInfo.innerHTML = `
+                <p class="font-semibold text-gray-800">${space.name}</p>
+                <p class="text-sm text-gray-600">${space.description || 'No description'}</p>
+            `;
+            loadFiles(spaceId);
+            loadActivityLog();
+            loadMembersList();
+            updateMemberDropdown(space);
+            updateSpaceManagement(space);
+        }
+
+        function updateSpaceManagement(space) {
+            const isAdmin = space.adminEmail === currentUser.email;
+            if (isAdmin) {
+                spaceManagement.classList.remove('hidden');
+            } else {
+                spaceManagement.classList.add('hidden');
+            }
+        }
+
+        function updateMemberDropdown(space) {
+            const memberSelect = document.getElementById('member-to-remove');
+            memberSelect.innerHTML = '<option value="">Select member to remove</option>';
+            
+            // Add all members except the admin (admin cannot be removed)
+            if (space.memberEmails) {
+                space.memberEmails.forEach(email => {
+                    if (email !== space.adminEmail) {
+                        const option = document.createElement('option');
+                        option.value = email;
+                        option.textContent = email;
+                        memberSelect.appendChild(option);
+                    }
+                });
+            }
+        }
+
+        async function loadActivityLog() {
+            if (!selectedSpaceId) return;
+            
+            try {
+                const response = await fetch(`/api/spaces/${selectedSpaceId}/activity`, {
+                    headers: {
+                        'Authorization': 'Bearer ' + authToken
+                    }
+                });
+
+                if (response.ok) {
+                    const activities = await response.json();
+                    displayActivityLog(activities);
+                } else {
+                    console.error('Failed to load activity log, status:', response.status);
+                    showError('Failed to load activity log');
+                }
+            } catch (error) {
+                console.error('Error loading activity log:', error);
+                showError('Error loading activity log: ' + error.message);
+            }
+        }
+
+        function displayActivityLog(activities) {
+            const activityList = document.getElementById('activity-list');
+            
+            if (activities.length === 0) {
+                activityList.innerHTML = '<p class="text-gray-500 text-center py-4">No activity yet</p>';
+                return;
+            }
+
+            activityList.innerHTML = activities.map(activity => `
+                <div class="border-l-4 border-blue-500 pl-4 py-2 bg-gray-50 rounded-r-lg">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center space-x-2">
+                            <span class="text-sm font-medium text-gray-800">${activity.userEmail}</span>
+                            <span class="text-sm text-gray-600">${activity.action}</span>
+                            ${activity.details ? `<span class="text-sm text-gray-500">${activity.details}</span>` : ''}
+                        </div>
+                        <span class="text-xs text-gray-500">${formatDateTime(activity.timestamp)}</span>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function formatDateTime(timestamp) {
+            const date = new Date(timestamp);
+            const now = new Date();
+            const diffMs = now - date;
+            const diffMins = Math.floor(diffMs / 60000);
+            const diffHours = Math.floor(diffMs / 3600000);
+            const diffDays = Math.floor(diffMs / 86400000);
+
+            if (diffMins < 1) return 'just now';
+            if (diffMins < 60) return `${diffMins}m ago`;
+            if (diffHours < 24) return `${diffHours}h ago`;
+            
+            // For more than 24 hours, show date/month/year format
+            return date.toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        }
+
+        async function loadMembersList() {
+            if (!selectedSpaceId) return;
+            
+            try {
+                const response = await fetch(`/api/spaces/${selectedSpaceId}`, {
+                    headers: {
+                        'Authorization': 'Bearer ' + authToken
+                    }
+                });
+
+                if (response.ok) {
+                    const space = await response.json();
+                    displayMembersList(space);
+                } else {
+                    console.error('Failed to load space details, status:', response.status);
+                    showError('Failed to load members list');
+                }
+            } catch (error) {
+                console.error('Error loading members list:', error);
+                showError('Error loading members list: ' + error.message);
+            }
+        }
+
+        function displayMembersList(space) {
+            const membersList = document.getElementById('members-list');
+            
+            // Create a combined list that includes admin and all members
+            const allMembers = new Set();
+            
+            // Add admin first
+            if (space.adminEmail) {
+                allMembers.add(space.adminEmail);
+            }
+            
+            // Add all other members
+            if (space.memberEmails) {
+                space.memberEmails.forEach(email => allMembers.add(email));
+            }
+            
+            const membersArray = Array.from(allMembers);
+            
+            if (membersArray.length === 0) {
+                membersList.innerHTML = '<p class="text-gray-500 text-center py-4">No members found</p>';
+                return;
+            }
+
+            membersList.innerHTML = membersArray.map(email => {
+                const isAdmin = email === space.adminEmail;
+                const isCurrentUser = email === currentUser.email;
+                
+                return `
+                    <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white text-sm font-medium">
+                                ${email.charAt(0).toUpperCase()}
+                            </div>
+                            <div>
+                                <span class="font-medium text-gray-800">${email}</span>
+                                ${isCurrentUser ? '<span class="text-xs text-blue-600 ml-2">(You)</span>' : ''}
+                            </div>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            ${isAdmin ? '<span class="px-2 py-1 bg-yellow-100 text-yellow-800 text-xs rounded-full">Admin</span>' : '<span class="px-2 py-1 bg-gray-100 text-gray-600 text-xs rounded-full">Member</span>'}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        async function createSpace() {
+            const name = document.getElementById('space-name').value;
+            const description = document.getElementById('space-description').value;
+
+            if (!name.trim()) {
+                showError('Please enter a space name');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/spaces', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + authToken
+                    },
+                    body: JSON.stringify({ name, description })
+                });
+
+                if (response.ok) {
+                    showSuccess('Space created successfully');
+                    hideModal('create-space-modal');
+                    document.getElementById('space-name').value = '';
+                    document.getElementById('space-description').value = '';
+                    loadSpaces();
+                    loadActivityLog(); // Refresh activity log
+                } else {
+                    const error = await response.json();
+                    showError('Failed to create space: ' + error.error);
+                }
+            } catch (error) {
+                showError('Error creating space: ' + error.message);
+            }
+        }
+
+        async function addMemberToSpace() {
+            const memberEmail = document.getElementById('member-email').value;
+            if (!memberEmail.trim()) {
+                showError('Please enter an email address');
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/spaces/${selectedSpaceId}/members`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + authToken
+                    },
+                    body: JSON.stringify({ email: memberEmail })
+                });
+
+                if (response.ok) {
+                    showSuccess('Member added successfully');
+                    document.getElementById('member-email').value = '';
+                    loadSpaces();
+                    loadActivityLog(); // Refresh activity log
+                    loadMembersList(); // Refresh members list
+                } else {
+                    const error = await response.json();
+                    showError('Failed to add member: ' + error.error);
+                }
+            } catch (error) {
+                showError('Error adding member: ' + error.message);
+            }
+        }
+
+        async function removeMemberFromSpace() {
+            const memberEmail = document.getElementById('member-to-remove').value;
+            if (!memberEmail.trim()) {
+                showError('Please select a member to remove');
+                return;
+            }
+
+            if (!confirm(`Are you sure you want to remove ${memberEmail} from this space?`)) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/spaces/${selectedSpaceId}/members/${encodeURIComponent(memberEmail)}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Authorization': 'Bearer ' + authToken
+                    }
+                });
+
+                if (response.ok) {
+                    showSuccess('Member removed successfully');
+                    loadSpaces();
+                    loadActivityLog(); // Refresh activity log
+                    loadMembersList(); // Refresh members list
+                } else {
+                    const error = await response.json();
+                    showError('Failed to remove member: ' + error.error);
+                }
+            } catch (error) {
+                showError('Error removing member: ' + error.message);
+            }
+        }
+
+        async function updateSpace() {
+            const space = spaces.find(s => s.id === selectedSpaceId);
+            const newName = prompt('Enter new space name:', space.name);
+            const newDescription = prompt('Enter new description:', space.description || '');
+
+            if (newName === null) return;
+
+            try {
+                const response = await fetch(`/api/spaces/${selectedSpaceId}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + authToken
+                    },
+                    body: JSON.stringify({ name: newName, description: newDescription })
+                });
+
+                if (response.ok) {
+                    showSuccess('Space updated successfully');
+                    loadSpaces();
+                    loadActivityLog(); // Refresh activity log
+                } else {
+                    const error = await response.json();
+                    showError('Failed to update space: ' + error.error);
+                }
+            } catch (error) {
+                showError('Error updating space: ' + error.message);
+            }
+        }
+
+        async function deleteSpace() {
+            if (!confirm('Are you sure you want to delete this space? This will delete all files in the space.')) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/spaces/${selectedSpaceId}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Authorization': 'Bearer ' + authToken
+                    }
+                });
+
+                if (response.ok) {
+                    showSuccess('Space deleted successfully');
+                    selectedSpaceId = null;
+                    selectedSpaceInfo.innerHTML = '<p class="text-sm text-gray-600">Select a space to view files</p>';
+                    filesList.innerHTML = '';
+                    document.getElementById('activity-list').innerHTML = '';
+                    document.getElementById('members-list').innerHTML = '';
+                    spaceManagement.classList.add('hidden');
+                    loadSpaces();
+                } else {
+                    const error = await response.json();
+                    showError('Failed to delete space: ' + error.error);
+                }
+            } catch (error) {
+                showError('Error deleting space: ' + error.message);
+            }
+        }
+
+        // File management
+        async function loadFiles(spaceId) {
+            console.log('Loading files for space:', spaceId);
+            try {
+                const response = await fetch(`/api/spaces/${spaceId}/files`, {
+                    headers: {
+                        'Authorization': 'Bearer ' + authToken
+                    }
+                });
+
+                if (response.ok) {
+                    const files = await response.json();
+                    console.log('Files loaded:', files);
+                    displayFiles(files);
+                } else {
+                    console.error('Failed to load files, status:', response.status);
+                    showError('Failed to load files');
+                }
+            } catch (error) {
+                console.error('Error loading files:', error);
+                showError('Error loading files: ' + error.message);
+            }
+        }
+
+        function displayFiles(files) {
+            filesList.innerHTML = '';
+            if (files.length === 0) {
+                filesList.innerHTML = '<p class="text-gray-500 text-center py-4">No files in this space</p>';
+                return;
+            }
+
+            files.forEach(file => {
+                const fileDiv = document.createElement('div');
+                fileDiv.className = 'p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition duration-200';
+                fileDiv.innerHTML = `
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <h4 class="font-medium text-gray-800">${file.originalFilename}</h4>
+                            <p class="text-sm text-gray-600">${formatFileSize(file.size)} • ${file.uploaderEmail}</p>
+                            <p class="text-xs text-gray-500">${new Date(file.uploadedAt).toLocaleDateString()}</p>
+                        </div>
+                        <div class="space-x-2">
+                            <button onclick="downloadFile('${file.id}')" class="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm transition duration-200">
+                                Download
+                            </button>
+                            <button onclick="deleteFile('${file.id}')" class="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-sm transition duration-200">
+                                Delete
+                            </button>
+                        </div>
+                    </div>
+                `;
+                filesList.appendChild(fileDiv);
+            });
+        }
+
+        async function uploadFiles() {
+            const fileInput = document.getElementById('file-input');
+            const files = fileInput.files;
+
+            if (files.length === 0) {
+                showError('Please select files to upload');
+                return;
+            }
+
+            if (!selectedSpaceId) {
+                showError('Please select a space first');
+                return;
+            }
+
+            for (const file of files) {
+                const formData = new FormData();
+                formData.append('file', file);
+
+                try {
+                    const response = await fetch(`/api/spaces/${selectedSpaceId}/files`, {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': 'Bearer ' + authToken
+                        },
+                        body: formData
+                    });
+
+                    if (response.ok) {
+                        showSuccess(`File ${file.name} uploaded successfully`);
+                        loadFiles(selectedSpaceId);
+                        loadActivityLog(); // Refresh activity log
+                    } else {
+                        const error = await response.json();
+                        showError(`Failed to upload ${file.name}: ${error.error}`);
+                    }
+                } catch (error) {
+                    showError(`Error uploading ${file.name}: ${error.message}`);
+                }
+            }
+
+            hideModal('upload-file-modal');
+            fileInput.value = '';
+        }
+
+        async function downloadFile(fileId) {
+            try {
+                const response = await fetch(`/api/files/${fileId}`, {
+                    headers: {
+                        'Authorization': 'Bearer ' + authToken
+                    }
+                });
+
+                if (response.ok) {
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'downloaded-file';
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    document.body.removeChild(a);
+                } else {
+                    showError('Failed to download file');
+                }
+            } catch (error) {
+                showError('Error downloading file: ' + error.message);
+            }
+        }
+
+        async function deleteFile(fileId) {
+            if (!confirm('Are you sure you want to delete this file?')) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/files/${fileId}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Authorization': 'Bearer ' + authToken
+                    }
+                });
+
+                if (response.ok) {
+                    showSuccess('File deleted successfully');
+                    loadFiles(selectedSpaceId);
+                    loadActivityLog(); // Refresh activity log
+                } else {
+                    const error = await response.json();
+                    showError('Failed to delete file: ' + error.error);
+                }
+            } catch (error) {
+                showError('Error deleting file: ' + error.message);
+            }
+        }
+
+        // Utility functions
+        function showModal(modalId) {
+            document.getElementById(modalId).classList.remove('hidden');
+            document.getElementById(modalId).classList.add('flex');
+        }
+
+        function hideModal(modalId) {
+            document.getElementById(modalId).classList.add('hidden');
+            document.getElementById(modalId).classList.remove('flex');
+        }
+
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        function showError(message) {
+            // Simple error display - you could enhance this with a proper notification system
+            alert('Error: ' + message);
+        }
+
+        function showSuccess(message) {
+            // Simple success display - you could enhance this with a proper notification system
+            alert('Success: ' + message);
+        }
+
+        // Check if user is already signed in
+        auth.onAuthStateChanged((user) => {
+            if (user) {
+                currentUser = user;
+                authenticateWithBackend(user);
+            }
+        });
+    </script>
+</body>
+</html>
